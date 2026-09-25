@@ -1,0 +1,111 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultTextAlignment center
+skinparam wrapWidth 155
+skinparam Padding 10
+skinparam DefaultFontSize 13
+skinparam DefaultFontName Arial
+skinparam ArrowColor #333333
+skinparam ArrowFontColor #6A1B9A
+skinparam ArrowFontSize 11
+skinparam ActorBackgroundColor #FFFFFF
+skinparam ActorBorderColor #111111
+skinparam ActorFontSize 12
+skinparam UseCaseBackgroundColor #EAF3FF
+skinparam UseCaseBorderColor #1A4F8A
+skinparam UseCaseFontSize 12
+skinparam RectangleBackgroundColor #FFFFFF
+skinparam RectangleBorderColor #111111
+skinparam PackageBackgroundColor #F7F9FC
+skinparam PackageBorderColor #5A6A7A
+skinparam PackageFontSize 12
+skinparam PackageFontStyle bold
+skinparam NoteBackgroundColor #FFF8E1
+skinparam NoteBorderColor #B08900
+skinparam packageStyle rectangle
+skinparam nodesep 50
+skinparam ranksep 45
+
+title Library Seat Management System — Use Case Diagram
+
+actor "Student\n(Library User)" as Student
+actor "Camera / Video Stream\n(per-floor surveillance)" as Camera
+
+rectangle "Library Seat Management System" {
+    package "User & Session Management" as P1 {
+        usecase "Register Account" as UC1
+        usecase "Log In / Log Out" as UC2
+        usecase "Switch Language" as UC7
+    }
+
+    package "Student Operations" as P2 {
+        usecase "View Floor Map\n& Seat Status" as UC3
+        usecase "View Seat Details\n/ Statistics" as UC4
+        usecase "Report Seat Issue" as UC5
+        usecase "Upload Photo Evidence" as UC6
+    }
+
+    package "Automated & Background Tasks" as P3 {
+        usecase "Detect Seat Occupancy\n(YOLOv11)" as UC8
+        usecase "Raise System Auto-Alarm\n(Malicious Occupancy)" as UC9
+        usecase "Export Daily/Monthly\nStatistics" as UC10
+        usecase "Trigger Floor Refresh" as UC16
+    }
+
+    package "Administrator Operations" as P4 {
+        usecase "View Anomaly List" as UC11
+        usecase "View Report Details\n& Images" as UC12
+        usecase "Confirm / Dismiss\nAnomaly" as UC13
+        usecase "Clear Anomaly" as UC14
+        usecase "Lock Seat (5 min)" as UC15
+    }
+
+    P1 -[hidden]down- P2
+    P2 -[hidden]down- P3
+    P3 -[hidden]down- P4
+}
+
+actor "Administrator\n(Library Staff)" as Admin
+actor "System Scheduler\n(Timer, internal trigger)" as Scheduler
+
+' Primary actor associations (not drawn to included use cases)
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC5
+Student --> UC7
+
+Camera --> UC8
+
+Admin --> UC11
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+Admin --> UC10
+Admin --> UC16
+
+Scheduler --> UC8
+Scheduler --> UC9
+Scheduler --> UC10
+Scheduler --> UC16
+
+' <<include>> : base always uses the included use case
+UC3 ..> UC2 : <<include>>
+UC5 ..> UC6 : <<include>>
+UC11 ..> UC12 : <<include>>
+
+' <<extend>> : optional extra behaviour
+UC9 ..> UC8 : <<extend>>
+UC13 ..> UC11 : <<extend>>
+UC14 ..> UC11 : <<extend>>
+UC15 ..> UC11 : <<extend>>
+
+note bottom of P3
+  **Note:** Detect Seat Occupancy runs automatically every 8 s per floor.
+  Auto-Alarm flags seats occupied by objects (no person) for > 2 h.
+end note
+
+@enduml

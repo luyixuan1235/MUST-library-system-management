@@ -2,7 +2,7 @@
 
 A full-stack application for managing library seats with real-time detection, reporting, and admin management features.
 
-## Project Structure
+## Project structure
 
 ```
 libraryseat/

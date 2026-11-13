@@ -26,13 +26,14 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   bool _isRegisterMode = false; // 是否处于注册模式
 
-  static const String _baseUrl = ApiConfig.baseUrl;
+  String get _baseUrl => ApiConfig.baseUrl;
 
   late final Dio _dio;
 
   @override
   void initState() {
     super.initState();
+    ApiConfig.loadSavedBaseUrl();
     BaseOptions options = BaseOptions(
       baseUrl: _baseUrl,
       connectTimeout: const Duration(seconds: 10),
@@ -46,6 +47,7 @@ class _LoginPageState extends State<LoginPage> {
     // 添加请求拦截器以处理Flutter Web的特殊情况
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
+        options.baseUrl = ApiConfig.baseUrl;
         // 确保请求头正确设置
         options.headers['Accept'] = 'application/json';
         handler.next(options);
@@ -94,18 +96,33 @@ class _LoginPageState extends State<LoginPage> {
         'password': pwd,
       };
       
-      final res = await _dio.post(
-        '/auth/login',
-        data: data,
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          headers: {
-            // 'Content-Type': 'application/x-www-form-urlencoded', // handled by contentType
-          },
-          // Flutter Web需要明确设置
-          receiveDataWhenStatusError: true,
-        ),
-      );
+      Response res;
+      try {
+        res = await _dio.post(
+          '/auth/login',
+          data: data,
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            receiveDataWhenStatusError: true,
+          ),
+        );
+      } on DioException catch (firstErr) {
+        if ((firstErr.type == DioExceptionType.connectionError ||
+             firstErr.type == DioExceptionType.connectionTimeout) &&
+            ApiConfig.baseUrl != 'http://127.0.0.1:8000') {
+          await ApiConfig.setCustomBaseUrl('http://127.0.0.1:8000');
+          res = await _dio.post(
+            '/auth/login',
+            data: data,
+            options: Options(
+              contentType: Headers.formUrlEncodedContentType,
+              receiveDataWhenStatusError: true,
+            ),
+          );
+        } else {
+          rethrow;
+        }
+      }
       debugPrint('Login Response Status: ${res.statusCode}');
       debugPrint('Login Response Data: ${res.data}');
       debugPrint('Login Response Type: ${res.data.runtimeType}');
@@ -526,10 +543,56 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _showServerConfigDialog,
+                    icon: Icon(Icons.wifi, size: 16, color: Colors.grey[600]),
+                    label: Text(
+                      'Server: $_baseUrl',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showServerConfigDialog() async {
+    final ctrl = TextEditingController(text: ApiConfig.baseUrl);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Wi-Fi Server Address'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Backend URL (e.g. http://172.20.10.10:8000)',
+            hintText: 'http://172.20.10.10:8000',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await ApiConfig.setCustomBaseUrl(null);
+              if (mounted) setState(() {});
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Reset Default'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await ApiConfig.setCustomBaseUrl(ctrl.text);
+              if (mounted) setState(() {});
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }

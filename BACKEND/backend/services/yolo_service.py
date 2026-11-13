@@ -281,6 +281,15 @@ def refresh_floor(db: Session, floor_cfg: Dict[str, Any], sample_frames: int = 1
 			# 如果 seek 失败，从当前位置继续
 			pass
 
+		# CPU 上 yolo11x 每帧约 1s，逐帧检测一轮要 30s，根本做不到实时。
+		# 这里仍然读满 sample_frames 帧（保持视频进度），但只对均匀抽样的
+		# 其中 DETECT_FRAMES_PER_REFRESH 帧做检测，阈值用的是命中比例，不受影响。
+		try:
+			detect_n = max(1, int(os.getenv("DETECT_FRAMES_PER_REFRESH", "5")))
+		except Exception:
+			detect_n = 5
+		detect_stride = max(1, sample_frames // detect_n)
+
 		read_frames = 0
 		while read_frames < sample_frames:
 			try:
@@ -299,6 +308,8 @@ def refresh_floor(db: Session, floor_cfg: Dict[str, Any], sample_frames: int = 1
 					else:
 						break
 				read_frames += 1
+				if (read_frames - 1) % detect_stride != 0:
+					continue
 				dets = detector.detect_frame(frame)
 
 				# For quicker mapping, build per-category points list

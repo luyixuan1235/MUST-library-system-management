@@ -47,22 +47,24 @@ class _FloorMapPageState extends State<FloorMapPage> {
   List<Seat> _mockF3Seats = [];
   List<Seat> _mockF4Seats = [];
 
-  // 硬编码的座位位置（因为后端不提供位置信息）
-  // 注意：座位位置是椅子图标的中心点，桌子位置需要避开座位
+  // 设计稿画布固定 600x800，所有坐标（桌子、椅子）都用这套坐标，
+  // 渲染时整张画布统一等比缩放，椅子不会因为单独缩放而漂移。
+  // 椅子坐标是图标左上角（图标 68x68），椅子必须坐在桌面上（图标中心落在桌面内）：
+  //   F1 长桌 x 160..380（中心 270），椅子中心 270±55 → left = 186 / 296
+  //   F2 长桌 x 180..360（中心 270），椅子中心 270±45 → left = 191 / 281
+  //   纵向：top = 桌 top + 25 - 34（椅子垂直居中于桌面）
   static final Map<String, Map<String, Offset>> _seatPositions = {
     'F1': {
-      // F1: 2x2 网格布局，保持原设定
-      'F1-01': const Offset(100, 400),  // 左下（无电源）
-      'F1-02': const Offset(250, 400),  // 右下（有电源）
-      'F1-03': const Offset(100, 200),  // 左上（无电源）
-      'F1-04': const Offset(250, 200),  // 右上（有电源）
+      'F1-01': const Offset(186, 391),  // 下排左（无电源）
+      'F1-02': const Offset(296, 391),  // 下排右（有电源）
+      'F1-03': const Offset(186, 191),  // 上排左（无电源）
+      'F1-04': const Offset(296, 191),  // 上排右（有电源）
     },
     'F2': {
-      // F2: 两排布局，每排2个座位，中间有圆桌
-      'F2-01': const Offset(80, 450),   // 下排左（无电源）
-      'F2-02': const Offset(320, 450), // 下排右（有电源）
-      'F2-03': const Offset(80, 250),  // 上排左（无电源）
-      'F2-04': const Offset(320, 250), // 上排右（无电源）
+      'F2-01': const Offset(191, 441),  // 下排左（无电源）
+      'F2-02': const Offset(281, 441),  // 下排右（有电源）
+      'F2-03': const Offset(191, 241),  // 上排左（无电源）
+      'F2-04': const Offset(281, 241),  // 上排右（无电源）
     },
     'F3': {
       // F3: 重新规划，6个座位，L型布局 + 中间区域
@@ -92,17 +94,17 @@ class _FloorMapPageState extends State<FloorMapPage> {
   static final List<List<Seat>> _seatLayouts = const [
     [
       // F1: 左边（01, 03）无电源，右边（02, 04）有电源
-      Seat(id: 'F1-01', status: 'empty', top: 400, left: 230),  // 左下（无电源）
-      Seat(id: 'F1-02', status: 'empty', top: 400, left: 380),  // 右下（有电源）
-      Seat(id: 'F1-03', status: 'empty', top: 200, left: 230),  // 左上（无电源）
-      Seat(id: 'F1-04', status: 'empty', top: 200, left: 380),  // 右上（有电源）
+      Seat(id: 'F1-01', status: 'empty', top: 391, left: 186),  // 下排左（无电源）
+      Seat(id: 'F1-02', status: 'empty', top: 391, left: 296),  // 下排右（有电源）
+      Seat(id: 'F1-03', status: 'empty', top: 191, left: 186),  // 上排左（无电源）
+      Seat(id: 'F1-04', status: 'empty', top: 191, left: 296),  // 上排右（有电源）
     ],
     [
       // F2: 两排布局，每排2个座位
-      Seat(id: 'F2-01', status: 'empty', top: 450, left: 210),   // 下排左（无电源）
-      Seat(id: 'F2-02', status: 'empty', top: 450, left: 450),  // 下排右（有电源）
-      Seat(id: 'F2-03', status: 'empty', top: 250, left: 210),  // 上排左（无电源）
-      Seat(id: 'F2-04', status: 'empty', top: 250, left: 450), // 上排右（无电源）
+      Seat(id: 'F2-01', status: 'empty', top: 441, left: 191),  // 下排左（无电源）
+      Seat(id: 'F2-02', status: 'empty', top: 441, left: 281),  // 下排右（有电源）
+      Seat(id: 'F2-03', status: 'empty', top: 241, left: 191),  // 上排左（无电源）
+      Seat(id: 'F2-04', status: 'empty', top: 241, left: 281),  // 上排右（无电源）
     ],
     [
       // F3: 6个座位，L型布局 + 右侧独立座位，优化布局
@@ -746,9 +748,7 @@ class _FloorMapPageState extends State<FloorMapPage> {
       }
     }
     
-    // 计算缩放比例（基于600x800的原始设计）
-    final scaleX = mapWidth / 600.0;
-    final scaleY = mapHeight / 800.0;
+    // 内层固定 600x800 设计稿画布，FittedBox 负责整体缩放到屏幕尺寸。
 
     return Scaffold(
       appBar: AppBar(
@@ -861,62 +861,42 @@ class _FloorMapPageState extends State<FloorMapPage> {
             _buildSidebar(isMobile: isMobile),
             Expanded(
               child: Center(
-                child: Stack(
-                  children: [
-                    // 静态地图，禁用拖动和缩放
-                    Container(
-                      color: Colors.transparent,
-                      width: mapWidth,
-                      height: mapHeight,
+                // 静态地图，禁用拖动和缩放
+                child: Container(
+                  color: Colors.transparent,
+                  width: mapWidth,
+                  height: mapHeight,
+                  child: FittedBox(
+                    fit: BoxFit.fill,
+                    alignment: Alignment.topLeft,
+                    child: SizedBox(
+                      width: 600,
+                      height: 800,
                       child: Stack(
                         children: [
-                          // 缩放桌子位置
-                          ...currentTables.map((table) {
-                            if (table is Positioned) {
-                              final top = (table.top ?? 0) * scaleY;
-                              final left = (table.left ?? 0) * scaleX;
-                              final child = table.child;
-                              // 获取child的尺寸并缩放
-                              return Positioned(
-                                top: top,
-                                left: left,
-                                child: Transform.scale(
-                                  scaleX: scaleX,
-                                  scaleY: scaleY,
-                                  alignment: Alignment.topLeft,
-                                  child: child,
-                                ),
-                              );
-                            }
-                            return table;
-                          }),
-                          // 缩放座位位置
+                          // 桌子与椅子共用同一套 600x800 设计稿坐标，整体一起缩放
+                          ...currentTables,
                           ...currentSeats.map(
                             (seat) => Positioned(
                               key: ValueKey('${seat.id}_${seat.getDisplayColor(_isAdmin)}'),
-                              top: seat.top * scaleY,
-                              left: seat.left * scaleX,
-                              child: Transform.scale(
-                                scaleX: scaleX,
-                                scaleY: scaleY,
-                                alignment: Alignment.center,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  transitionBuilder: (child, animation) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    );
-                                  },
-                                  child: _buildSeatIcon(seat),
-                                ),
+                              top: seat.top,
+                              left: seat.left,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                child: _buildSeatIcon(seat),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1708,7 +1688,7 @@ class _FloorMapPageState extends State<FloorMapPage> {
     // 根据屏幕尺寸调整图标大小，增大图标让座位更明显
     final screenSize = MediaQuery.of(context).size;
     final isMobile = screenSize.width < 600;
-    final iconSize = isMobile ? 60.0 : 68.0; // 增大图标尺寸
+    final iconSize = 68.0; // 画布内固定尺寸，整体缩放由 FittedBox 负责
     
     return GestureDetector(
       onTap: () => _showSeatDetailDialog(seat),

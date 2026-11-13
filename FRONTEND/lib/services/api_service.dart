@@ -19,9 +19,10 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 10),
     ));
 
-    // 添加 token 拦截器
+    // 添加 token 拦截器（并动态同步当前 baseUrl）
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        options.baseUrl = ApiConfig.baseUrl;
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('token');
         if (token != null) {
